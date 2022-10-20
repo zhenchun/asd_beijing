@@ -1,0 +1,89 @@
+---
+title: "China ASD"
+author: "Zhenchun Yang"
+date: "2022-10-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#knitr::opts_knit$set(root.dir = "/Users/zen/Desktop/climate+health")
+
+knitr::opts_knit$set(root.dir = "C:/Users/zy125/Box/Postdoc/ASD")
+
+
+setwd("C:/Users/zy125/Box/Postdoc/ASD")
+```
+
+```{r, message=FALSE, echo=FALSE}
+#Load the required packages. 
+
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(tidyr, lubridate,readxl,data.table, tigris, dplyr, sf, ggplot2, readr, tmap, mapchina)
+
+
+
+
+```
+
+# 1.Load the data
+```{r, message=FALSE, echo=FALSE}
+setwd("C:/Users/zy125/Box/Postdoc/ASD")
+address<-read_csv("address.csv")
+address$id<-as.character(address$id)
+
+```
+
+# 1.1 Check the birthdate. 
+
+```{r}
+
+
+address<-address%>%mutate(birthday=mdy(birthday), olympics_start=mdy(olympics_start), olympics_end=mdy(olympics_end), olympics=case_when(birthday<olympics_start ~"before",
+                                                birthday>olympics_end ~ "after",
+                                                birthday<=olympics_end & birthday>=olympics_start ~ "during"))
+
+table(address$olympics)
+
+```
+# 1.2 Load the map of China
+
+
+
+```{r}
+
+
+
+china<-st_transform(mapchina::china, crs=3857)%>%group_by(Name_Province) %>%summarise(geometry = st_union(geometry))
+
+add_1<-address%>%select(id,birthday,gestation_week,olympics_start,olympics_end,Lng1, Lat1)%>%drop_na()
+
+address_sf<-st_as_sf(add_1, coords=c("Lng1", "Lat1"), crs=4326)
+address_sf<-st_transform(address_sf, crs=3857)
+
+tm_shape(china) +
+  tm_polygons('#f0f0f0f0', border.alpha = 0.2)+tm_shape(address_sf) +
+  tm_dots(col="black")
+
+
+
+```
+
+
+```{r}
+
+beijing<-st_transform(mapchina::china, crs=3857)%>%filter(Code_Province %in% c("11"))
+
+inter<-lengths(st_intersects(address_sf, beijing)) > 0
+
+address_bj_sf<-address_sf[inter,]
+
+dim(address_bj_sf)
+
+ tm_shape(beijing) +
+   tm_polygons('#f0f0f0f0', border.alpha = 0.2)+tm_shape(address_bj_sf) +
+   tm_dots(col="black")
+
+```
+
+
