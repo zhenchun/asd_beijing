@@ -19,7 +19,7 @@ setwd("C:/Users/zy125/Box/Postdoc/ASD")
 #Load the required packages. 
 
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(tidyr, lubridate,readxl,data.table, tigris, dplyr, sf, ggplot2, readr, tmap, mapchina)
+pacman::p_load(tidyr, lubridate,readxl,data.table, tigris, dplyr, sf, ggplot2, readr, tmap, mapchina,tidyverse, DT)
 
 
 
@@ -56,14 +56,14 @@ table(address$olympics)
 
 china<-st_transform(mapchina::china, crs=3857)%>%group_by(Name_Province) %>%summarise(geometry = st_union(geometry))
 
-add_1<-address%>%select(id,birthday,gestation_week,olympics_start,olympics_end,Lng1, Lat1)%>%drop_na()
+#add_1<-address%>%select(id,birthday,gestation_week,olympics_start,olympics_end,Lng1, Lat1)%>%drop_na()
 
-address_sf<-st_as_sf(add_1, coords=c("Lng1", "Lat1"), crs=4326)
-address_sf<-st_transform(address_sf, crs=3857)
+#address_sf<-st_as_sf(add_1, coords=c("Lng1", "Lat1"), crs=4326)
+#address_sf<-st_transform(address_sf, crs=3857)
 
-tm_shape(china) +
-  tm_polygons('#f0f0f0f0', border.alpha = 0.2)+tm_shape(address_sf) +
-  tm_dots(col="black")
+#tm_shape(china) +
+  #tm_polygons('#f0f0f0f0', border.alpha = 0.2)+tm_shape(address_sf) +
+  #tm_dots(col="black")
 
 
 
@@ -72,18 +72,49 @@ tm_shape(china) +
 
 ```{r}
 
-beijing<-st_transform(mapchina::china, crs=3857)%>%filter(Code_Province %in% c("11"))
+#beijing<-st_transform(mapchina::china, crs=3857)%>%filter(Code_Province %in% c("11"))
 
-inter<-lengths(st_intersects(address_sf, beijing)) > 0
+#inter<-lengths(st_intersects(address_sf, beijing)) > 0
 
-address_bj_sf<-address_sf[inter,]
+#address_bj_sf<-address_sf[inter,]
 
-dim(address_bj_sf)
+#dim(address_bj_sf)
 
- tm_shape(beijing) +
-   tm_polygons('#f0f0f0f0', border.alpha = 0.2)+tm_shape(address_bj_sf) +
-   tm_dots(col="black")
+ #tm_shape(beijing) +
+   #tm_polygons('#f0f0f0f0', border.alpha = 0.2)+tm_shape(address_bj_sf) +
+   #tm_dots(col="black")
 
 ```
 
+```{r}
+
+address_long<-pivot_longer(address, cols  = Lng_p3h:Lat_c9w, names_to = c(".value", "group"), 
+    names_sep = "\\_")
+
+address_long<-address_long%>%mutate(conception=birthday-gestation_week*7,
+                          address=if_else(str_sub(group,-1)=="h","home", "work"),
+                          period= str_sub(group,1,1),
+                          month= as.numeric(str_sub(group,2,2)),
+                          time=if_else(period=="c",conception%m+%                                            months(month-1),conception%m-% months(month)))
+
+
+
+address_long%>%as_tibble()%>%datatable()
+
+address_sf<-address_long%>%drop_na()%>%st_as_sf( coords=c("Lng", "Lat"), crs=4326)%>%st_transform(crs=3857)%>%st_join(china)
+
+
+address_change<-address_long %>%
+       group_by(id,address) %>%distinct(Lng, Lat)%>%
+       summarise(address_change=n())
+
+address_province<-address_sf %>%st_drop_geometry()%>%
+       group_by(id,address) %>%distinct(Name_Province)%>%
+       summarise(province=n())
+
+table(address_change$address_change)
+
+
+address_province%>%group_by(address,province)%>%summarize(n=n())
+```
 
